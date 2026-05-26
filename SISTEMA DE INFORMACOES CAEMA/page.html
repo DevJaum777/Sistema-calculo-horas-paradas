@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Paradas</title>
+    <style>
+        :root {
+            --primary: #25D366;
+            --dark: #128C7E;
+            --bg: #f0f2f5;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 500px;
+            margin-bottom: 20px;
+        }
+        h2, h3 {
+            margin-top: 0;
+            color: #333;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background-color: var(--dark);
+        }
+        .historico {
+            width: 100%;
+            max-width: 500px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            box-sizing: border-box;
+        }
+        .item-historico {
+            border-bottom: 1px solid #eee;
+            padding: 10px 0;
+            font-size: 14px;
+        }
+        .total-mes {
+            font-size: 18px;
+            font-weight: bold;
+            color: #d32f2f;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>🚨 Registro de Parada</h2>
+        <form id="formParada">
+            <div class="form-group">
+                <label>Seu Número de WhatsApp (com DDD):</label>
+                <input type="number" id="meuWhatsapp" placeholder="Ex: 5599988887777" required>
+            </div>
+            <hr>
+            <div class="form-group">
+                <label>Nome:</label>
+                <input type="text" id="nome" required placeholder="Quem está registrando">
+            </div>
+            <div class="form-group">
+                <label>Cidade:</label>
+                <input type="text" id="cidade" required placeholder="Cidade da ocorrência">
+            </div>
+            <div class="form-group">
+                <label>Motivo da Parada:</label>
+                <textarea id="motivo" rows="3" required placeholder="O que aconteceu?"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Horário da Parada:</label>
+                <input type="time" id="horaParada" required>
+            </div>
+            <div class="form-group">
+                <label>Horário do Retorno:</label>
+                <input type="time" id="horaRetorno" required>
+            </div>
+            <button type="submit">📲 Gerar e Enviar para WhatsApp</button>
+        </form>
+    </div>
+
+    <div class="historico">
+        <h3>📊 Histórico / Relatório do Mês</h3>
+        <div class="total-mes" id="totalHoras">Total Parado: 00:00h</div>
+        <div id="listaRegistros">
+            </div>
+        <button onclick="limparHistorico()" style="background-color: #e53935; margin-top: 15px; font-size: 12px; padding: 5px;">Limpar Histórico</button>
+    </div>
+
+    <script>
+        // Configuração inicial do número de telefone salvo para facilitar
+        document.getElementById('meuWhatsapp').value = localStorage.getItem('telSalvo') || '';
+
+        const form = document.getElementById('formParada');
+        
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const numeroWhats = document.getElementById('meuWhatsapp').value;
+            const nome = document.getElementById('nome').value;
+            const cidade = document.getElementById('cidade').value;
+            const motivo = document.getElementById('motivo').value;
+            const horaParada = document.getElementById('horaParada').value;
+            const horaRetorno = document.getElementById('horaRetorno').value;
+
+            // Salva o número para a próxima vez
+            localStorage.setItem('telSalvo', numeroWhats);
+
+            // Calcular a diferença de horas
+            const [hP, mP] = horaParada.split(':').map(Number);
+            const [hR, mR] = horaRetorno.split(':').map(Number);
+            
+            let minutosParados = (hR * 60 + mR) - (hP * 60 + mP);
+            if (minutosParados < 0) minutosParados += 24 * 60; // Caso vire a noite
+
+            const horasFinais = Math.floor(minutosParados / 60);
+            const minsFinais = minutosParados % 60;
+            const tempoFormatado = `${String(horasFinais).padStart(2, '0')}:${String(minsFinais).padStart(2, '0')}`;
+
+            // Criar objeto do registro
+            const novoRegistro = { nome, cidade, motivo, horaParada, horaRetorno, tempoFormatado, minutosParados, data: new Date().toLocaleDateString('pt-BR') };
+
+            // Salvar no LocalStorage (Histórico do Navegador)
+            let historico = JSON.parse(localStorage.getItem('historicoParadas')) || [];
+            historico.push(novoRegistro);
+            localStorage.setItem('historicoParadas', JSON.stringify(historico));
+
+            // Atualizar a tela
+            renderizarHistorico();
+
+            // Montar texto do WhatsApp
+            const textoMensagem = `🚨 *CONTA DE PARADA* 🚨\n\n` +
+                                 `👤 *Nome:* ${nome}\n` +
+                                 `📍 *Cidade:* ${cidade}\n` +
+                                 `📝 *Motivo:* ${motivo}\n` +
+                                 `⏳ *Parou às:* ${horaParada}\n` +
+                                 `✅ *Voltou às:* ${horaRetorno}\n` +
+                                 `⏱️ *Total Parado:* ${tempoFormatado}h`;
+
+            // Criar link do WhatsApp
+            const urlWhats = `https://api.whatsapp.com/send?phone=${numeroWhats}&text=${encodeURIComponent(textoMensagem)}`;
+            
+            // Abre o WhatsApp
+            window.open(urlWhats, '_blank');
+            form.reset();
+            document.getElementById('meuWhatsapp').value = numeroWhats; // Mantém o número
+        });
+
+        function renderizarHistorico() {
+            const lista = document.getElementById('listaRegistros');
+            const totalContainer = document.getElementById('totalHoras');
+            let historico = JSON.parse(localStorage.getItem('historicoParadas')) || [];
+            
+            lista.innerHTML = '';
+            let totalMinutos = 0;
+
+            historico.forEach(reg => {
+                totalMinutos += reg.minutosParados;
+                lista.innerHTML += `
+                    <div class="item-historico">
+                        <strong>${reg.data} - ${reg.cidade}</strong><br>
+                        Motivo: ${reg.motivo}<br>
+                        Duração: <span style="color:red">${reg.tempoFormatado}h</span> (${reg.horaParada} às ${reg.horaRetorno})
+                    </div>
+                `;
+            });
+
+            // Formata o grande total do mês
+            const totalH = Math.floor(totalMinutos / 60);
+            const totalM = totalMinutos % 60;
+            totalContainer.innerText = `Total Parado no Mês: ${String(totalH).padStart(2, '0')}:${String(totalM).padStart(2, '0')}h`;
+        }
+
+        function limparHistorico() {
+            if(confirm("Deseja zerar o histórico deste mês?")) {
+                localStorage.removeItem('historicoParadas');
+                renderizarHistorico();
+            }
+        }
+
+        // Carrega o histórico ao abrir a página
+        renderizarHistorico();
+    </script>
+</body>
+</html>
